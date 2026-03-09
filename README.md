@@ -1,210 +1,198 @@
-# BRKGA CartPole Workflow
+# NN-GA (BRKGA for CartPole)
 
-This project trains a CartPole policy with a BRKGA (Biased Random-Key Genetic Algorithm), saves agents and artifacts per run, records selected policy videos, and visualizes network parameters over time.
+Train a neural-network policy for `CartPole-v1` using a Biased Random-Key Genetic Algorithm (BRKGA), then automatically save artifacts (agents, plots, videos, and network visualizations) per run.
 
-This README is intended as the single source of truth for how to run and reuse the project.
+## What this project does
 
-## 1. Project Structure
+- Evolves policy parameters with BRKGA.
+- Evaluates individuals with Gymnasium rollouts.
+- Saves best and progress agent bundles as `.npz`.
+- Records gameplay videos from saved genomes.
+- Renders neural-network diagrams for saved agents.
 
-- `config.py`: all parameters and flags (training, recording, outputs).
-- `run.py`: main entrypoint (train + save + optional validation + visualizations).
-- `algorithm.py`: BRKGA core loop and population evolution.
-- `fitness_function.py`: policy model + rollout fitness.
-- `agent_store.py`: save/load `.npz` agent bundles.
-- `video_utils.py`: MP4 recording utilities.
-- `visualizer_utils.py`: fitness plots and CSV history export.
-- `network_visualizer.py`: draw NN graph from saved genome.
-- `visualize_network_progress.py`: render NN images across saved progress generations.
-- `render_all_saved_agents.py`: render NN image for every saved agent bundle.
-- `validate_agent.py`: run and record one full validation episode from saved best agent.
+## Project layout
 
-## 2. One Run = One Folder
+- `run.py`: main pipeline (train + save + record + visualize).
+- `config.py`: all experiment settings.
+- `algorithm.py`: BRKGA evolution loop and run directory setup.
+- `fitness_function.py`: policy model, genome mapping, fitness rollout.
+- `agent_store.py`: save/load agent bundles.
+- `video_utils.py`: Gymnasium video recording helper.
+- `network_visualizer.py`: render network image from one agent.
+- `visualize_network_progress.py`: render progression frames from checkpoint agents.
+- `render_all_saved_agents.py`: batch-render all `.npz` agents, optional MP4 progression.
+- `validate_agent.py`: record one validation episode from latest best agent.
+- `record_saved_agent.py`: record the latest best agent without retraining.
 
-Each training run creates a timestamped folder:
-
-- `runs/YYYY-MM-DD-HH:MM/`
-  - `agents/`
-  - `plots/`
-  - `videos/`
-
-Typical files produced:
-
-- `agents/best_agent.npz`: global best at end of run.
-- `agents/progress_best_gen_XXX.npz`: best agents at progress checkpoint generations.
-- `agents/visualizer/*.png`: NN renders auto-generated for all agents in this run.
-- `plots/fitness_history.png`: best fitness progression plot.
-- `plots/fitness_history.csv`: generation stats.
-- `plots/best_network.png`: NN render for global best.
-- `videos/gen_XXX-episode-0.mp4`: progress videos.
-- `videos/best_global_validated_000-episode-0.mp4`: optional final validation video.
-
-## 3. Quick Start
-
-1. Install dependencies:
+## Installation
 
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-2. Run training:
+Dependencies from `requirements.txt`:
+
+- `numpy`
+- `torch`
+- `gymnasium`
+- `matplotlib`
+
+Note:
+- `render_all_saved_agents.py --make-video` requires `ffmpeg` available on PATH.
+
+## Quick start
 
 ```bash
 python3 run.py
 ```
 
-3. Inspect latest run outputs under `runs/`.
+After a run, check:
 
-## 4. Main Workflow (What Happens in `run.py`)
+- `runs/<run-id>/agents/`
+- `runs/<run-id>/plots/`
+- `runs/<run-id>/videos/`
 
-1. Load config from `BRKGAConfig()` in `config.py`.
-2. Create run folder (`runs/<timestamp>/...`) and wire output directories.
-3. Determine progress generation checkpoints (5 total).
-4. Run BRKGA evolution (`algorithm.run_brkga`):
-   - evaluate population,
-   - preserve elites,
-   - crossover + mutants,
-   - early stop by plateau only.
-5. During selected progress generations:
-   - record a video,
-   - optionally save that generation's best agent bundle.
-6. After training:
-   - save global best agent (`best_agent.npz`),
-   - save fitness plot and CSV,
-   - render `best_network.png` (if enabled),
-   - auto-render NN images for all agents into `agents/visualizer/`,
-   - optionally run final validation recording.
+`<run-id>` defaults to timestamp format: `YYYY-MM-DD-HH:MM`.
 
-## 5. Core Behavior You Configured
+## Default behavior (current config)
 
-### Elitism consistency
-Elites are copied unchanged, and evaluation seeding is genome-stable, so copied elites are evaluated under identical conditions across generations (`fixed_eval_seeds=True` case).
+From `BRKGAConfig` defaults in `config.py`:
 
-### Early stopping
-No max-fitness constraint is used anymore. Stopping is plateau-based only:
+- Population: `pop_size=10`
+- Generations: `generations=50`
+- Hidden layers: `(8, 8)`
+- Evaluation: `episodes_per_individual=3`, `max_steps=1000`
+- Early stop: `early_stop_patience=8`, `early_stop_min_delta=1e-6`
+- Progress recording: enabled (`rec_progress=True`)
+- Progress checkpoints: every generation (`record_every_generation=True`)
+- Save progress agents: every generation (`save_every_generation_agent_bundle=True`)
+- Final best validation video: enabled (`record_best=True`)
 
-- `early_stop_patience`
-- `early_stop_min_delta`
+## Output structure
 
-### Progress recording
-When `rec_progress=True`, exactly 5 generations are selected:
+Each `python3 run.py` creates a new run folder:
 
-- with `rec_progress_include_first=True`: first + 3 middle + last,
-- with `rec_progress_include_first=False`: 5 checkpoints excluding generation 0.
+```text
+runs/<run-id>/
+  agents/
+    best_agent.npz
+    progress_best_gen_000.npz
+    ...
+    visualizer/
+      *_network.png
+      network_progression.gif
+      network_progression.mp4   # only if ffmpeg succeeded
+  plots/
+    fitness_history.png
+    fitness_history.csv
+  videos/
+    gen_000-episode-0.mp4
+    ...
+    best_global_validated_000-episode-0.mp4
+```
 
-## 6. Important Config Flags (`config.py`)
+## Common commands
 
-### Training
-- `seed`: global seed.
-- `pop_size`, `generations`: BRKGA scale.
-- `elite_frac`, `mutant_frac`, `bias`: BRKGA dynamics.
-- `episodes_per_individual`, `max_steps`: fitness evaluation setup.
-- `fixed_eval_seeds`: reproducible per-genome evaluation.
-
-### Recording
-- `rec_progress`: enable progress checkpoint recording.
-- `rec_progress_include_first`: include generation 0 in the 5 checkpoints.
-- `record_max_steps`: max steps in recorded episode.
-- `record_best`: validate and record the global best at end.
-- `video_prefix`: prefix for progress videos.
-
-### Agent persistence
-- `save_best_agent_bundle`: save final global best.
-- `save_progress_agent_bundles`: save progress checkpoint best agents.
-- `agent_prefix`: file prefix for global best.
-- `progress_agent_prefix`: file prefix for progress generation best agents.
-
-### Network visualization
-- `draw_best_network`: render global best NN after run.
-- `network_plot_name`: filename in `plots/`.
-
-### Output layout
-- `run_root_dir`: parent output folder (default `runs`).
-- `run_id`: optional fixed run id; if `None`, timestamp is used.
-
-## 7. Commands You’ll Reuse
-
-### A) Train + full pipeline
+Train full pipeline:
 
 ```bash
 python3 run.py
 ```
 
-### B) Validate best agent from latest run (one full episode)
+Validate latest best agent (single episode recording):
 
 ```bash
 python3 validate_agent.py
 ```
 
-### C) Render best network from latest run
+Record latest best agent without retraining:
+
+```bash
+python3 record_saved_agent.py
+```
+
+Render latest best network:
 
 ```bash
 python3 network_visualizer.py
 ```
 
-Open directly in a window instead of saving:
+Render a specific agent and save to custom path:
 
 ```bash
-python3 network_visualizer.py --show
+python3 network_visualizer.py --agent-path runs/<run-id>/agents/best_agent.npz --save-path runs/<run-id>/plots/custom_network.png
 ```
 
-### D) Render progression of saved checkpoint agents
+Render network progression frames from checkpoint agents:
 
 ```bash
 python3 visualize_network_progress.py
 ```
 
-Outputs to:
-
-- `runs/<latest>/plots/network_progress/network_gen_XXX.png`
-
-### E) Render NN for all saved agents
+Batch render all agents in one run:
 
 ```bash
-python3 render_all_saved_agents.py --agents-dir runs/<run-id>/agents
+python3 render_all_saved_agents.py --agents-dir runs/<run-id>/agents --out-dir runs/<run-id>/agents/visualizer
 ```
 
-Default output:
-
-- `runs/<run-id>/agents/visualizer/*.png`
-
-Across all runs recursively:
+Batch render recursively and optionally build MP4:
 
 ```bash
-python3 render_all_saved_agents.py --agents-dir runs --recursive --out-dir runs/all_visualizer
+python3 render_all_saved_agents.py --agents-dir runs --recursive --out-dir runs/all_visualizer --make-video
 ```
 
-## 8. Typical Troubleshooting
+## Configuration workflow
 
-### "Import ... could not be resolved"
-Your IDE interpreter does not have project deps. Use the same Python environment where `pip install -r requirements.txt` was run.
-
-### Progress video shows resets
-A reset means episode ended (terminated/truncated). Current setup records single episodes for progress and validation.
-
-### Best per generation appears to decrease
-That can happen with stochastic eval if seeds vary. With `fixed_eval_seeds=True` and genome-stable seeding, copied elites remain comparable.
-
-### Can't find generated images
-Look in latest run folder:
-
-- `runs/<latest>/plots/best_network.png`
-- `runs/<latest>/agents/visualizer/*.png`
-- `runs/<latest>/plots/network_progress/*.png`
-
-## 9. Recommended Daily Routine
-
-1. Edit `config.py` for your experiment settings.
+1. Edit `config.py`.
 2. Run `python3 run.py`.
-3. Review:
-   - `plots/fitness_history.png`
-   - `videos/`
-   - `agents/visualizer/`
-4. If needed, run:
-   - `python3 visualize_network_progress.py`
-5. Keep each run folder as immutable experiment history.
+3. Compare run folders under `runs/`.
 
-## 10. Notes on Reproducibility
+Useful settings to tune first:
 
-- Reproducibility depends on fixed seeds and same environment.
-- Different CPU/OS/library versions can still slightly change outcomes.
-- Save run folder + config snapshot (`training_config` is stored in agent metadata) for traceability.
+- `pop_size`, `generations`
+- `hidden_layers`
+- `episodes_per_individual`, `max_steps`
+- `elite_frac`, `mutant_frac`, `bias`
+- `processes` (parallel workers)
+- `record_every_generation` and `save_every_generation_agent_bundle`
+
+## Minimal experiment preset
+
+Use this preset when you want a quick local sanity check (few minutes instead of full runs).  
+Edit `config.py` and temporarily set:
+
+```python
+pop_size = 8
+generations = 10
+episodes_per_individual = 1
+max_steps = 300
+processes = 1
+
+rec_progress = False
+save_progress_agent_bundles = False
+record_best = False
+```
+
+Why this is faster:
+
+- Smaller population and fewer generations reduce total evaluations.
+- One episode per individual cuts rollout cost.
+- Lower `max_steps` caps long episodes.
+- Disabling progress saves/recording removes extra I/O and rendering work.
+
+## Reproducibility notes
+
+- `seed` controls global RNG seeding.
+- With `fixed_eval_seeds=True`, each genome gets a deterministic evaluation seed derived from genome content, improving cross-generation comparability.
+- Results can still vary by Python/OS/library versions.
+
+## Troubleshooting
+
+- No videos generated:
+  - confirm Gymnasium recording works in your environment and write permissions exist in the run folder.
+- `network_progression.mp4` missing:
+  - `ffmpeg` is likely not installed or not on PATH.
+- Slower training than expected:
+  - reduce `episodes_per_individual`/`max_steps` or tune `processes` in `config.py`.
