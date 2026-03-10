@@ -1,6 +1,6 @@
-# NN-GA (BRKGA for CartPole)
+# NN-GA (BRKGA for MountainCar)
 
-Train a neural-network policy for `CartPole-v1` using a Biased Random-Key Genetic Algorithm (BRKGA), then automatically save artifacts (agents, plots, videos, and network visualizations) per run.
+Train a neural-network policy for `MountainCarContinuous-v0` using a Biased Random-Key Genetic Algorithm (BRKGA), then automatically save artifacts (agents, plots, videos, and network visualizations) per run.
 
 ## What this project does
 
@@ -9,6 +9,14 @@ Train a neural-network policy for `CartPole-v1` using a Biased Random-Key Geneti
 - Saves best and progress agent bundles as `.npz`.
 - Records gameplay videos from saved genomes.
 - Renders neural-network diagrams for saved agents.
+
+## Environment assumptions (MountainCarContinuous-v0)
+
+- Observation space: shape `(2,)` (`position`, `velocity`).
+- Action space: `Box([-1], [1], (1,))` (continuous force).
+- Reward: `-0.1 * action^2` per step, plus `+100` on goal-reaching step.
+- Termination: reaches goal position (`x >= 0.45` by default).
+- Truncation: 999 steps per episode.
 
 ## Project layout
 
@@ -63,7 +71,7 @@ From `BRKGAConfig` defaults in `config.py`:
 - Population: `pop_size=10`
 - Generations: `generations=50`
 - Hidden layers: `(8, 8)`
-- Evaluation: `episodes_per_individual=3`, `max_steps=1000`
+- Evaluation: `episodes_per_individual=3`, `max_steps=999`
 - Early stop: `early_stop_patience=8`, `early_stop_min_delta=1e-6`
 - Progress recording: enabled (`rec_progress=True`)
 - Progress checkpoints: every generation (`record_every_generation=True`)
@@ -167,7 +175,7 @@ Edit `config.py` and temporarily set:
 pop_size = 8
 generations = 10
 episodes_per_individual = 1
-max_steps = 300
+max_steps = 200
 processes = 1
 
 rec_progress = False

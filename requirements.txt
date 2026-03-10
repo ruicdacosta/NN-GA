@@ -2,3 +2,5 @@ numpy
 torch
 gymnasium
 matplotlib
+moviepy
+pygame

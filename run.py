@@ -5,6 +5,8 @@ Run training + save + optional best-agent validation recording.
 import multiprocessing as mp
 import os
 from dataclasses import asdict
+from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 from agent_store import load_agent_bundle, save_agent_bundle
@@ -19,11 +21,41 @@ from validate_agent import validate_agent
 from video_utils import record_policy_to_mp4
 
 
+def write_run_config_snapshot(cfg: BRKGAConfig, run_dir: str) -> str:
+    """Persist the effective run configuration plus the source config module."""
+    config_path = Path(__file__).with_name("config.py")
+    snapshot_path = Path(run_dir) / "run_config_snapshot.txt"
+    resolved_cfg = asdict(cfg)
+
+    lines = [
+        '"""Auto-generated configuration snapshot for this run."""',
+        "",
+        f"# Generated at: {datetime.now().isoformat(timespec='seconds')}",
+        f"# Source file: {config_path.name}",
+        "",
+        "# Effective BRKGAConfig values used for this run:",
+    ]
+    lines.extend(f"{key} = {value!r}" for key, value in resolved_cfg.items())
+    lines.extend(
+        [
+            "",
+            "# Copy of config.py at run start:",
+            "",
+            config_path.read_text(encoding="utf-8").rstrip(),
+            "",
+        ]
+    )
+    snapshot_path.write_text("\n".join(lines), encoding="utf-8")
+    return str(snapshot_path)
+
+
 def main() -> None:
     cfg = BRKGAConfig()
 
     run_dir = prepare_run_dirs(cfg)
     print(f"[RUN] {os.path.abspath(run_dir)}")
+    config_snapshot_path = write_run_config_snapshot(cfg, run_dir)
+    print(f"[CFG] {os.path.abspath(config_snapshot_path)}")
 
     prog = []
     if cfg.rec_progress:
@@ -90,7 +122,8 @@ def main() -> None:
 
     if cfg.rec_progress and prog:
         print("\n[REC] Rendering progress videos post-training...")
-        for gen in prog:
+        available_gens = sorted(set(progress_agent_paths.keys()) | set(progress_genomes.keys()))
+        for gen in available_gens:
             try:
                 if gen in progress_agent_paths:
                     genome, hidden_layers, _meta = load_agent_bundle(progress_agent_paths[gen])
@@ -111,6 +144,7 @@ def main() -> None:
                     video_length_steps=cfg.record_max_steps,
                     record_each_episode=False,
                     seed=cfg.seed,
+                    env_id=cfg.env_id,
                 )
                 if mp4_path:
                     print(f"   [VID] Gen {gen:03d}: {mp4_path}")

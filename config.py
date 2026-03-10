@@ -9,25 +9,32 @@ from typing import Optional, Tuple
 
 @dataclass
 class BRKGAConfig:
+    # Environment
+    env_id: str = "MountainCarContinuous-v0"
+
     # Reproducibility
     seed: int = 123
 
     # Population
-    pop_size: int = 10
-    generations: int = 50
+    pop_size: int = 100
+    generations: int = 200
 
     # BRKGA parameters
     elite_frac: float = 0.20
-    mutant_frac: float = 0.20
-    bias: float = 0.70
+    mutant_frac: float = 0.30
+    bias: float = 0.60
 
     # Evaluation
-    episodes_per_individual: int = 3
-    max_steps: int = 1000
+    episodes_per_individual: int = 5
+    max_steps: int = 999
     fixed_eval_seeds: bool = True #If True, each individual gets the same eval seeds
+    use_shaped_fitness: bool = True
+    mountaincar_progress_scale: float = 1000.0
+    mountaincar_velocity_scale: float = 50.0
+    mountaincar_goal_bonus: float = 1000.0
 
     # Model
-    hidden_layers: Tuple[int, ...] = (8,8)
+    hidden_layers: Tuple[int, ...] = (8, 8)
 
     # Parallelism
     processes: int = max(1, mp.cpu_count() - 1)
@@ -41,8 +48,8 @@ class BRKGAConfig:
     rec_progress: bool = True
     rec_progress_include_first: bool = True
     record_every_generation: bool = True
-    record_episodes: int = 5
-    record_max_steps: int = 500
+    record_episodes: int = 5 
+    record_max_steps: int = 999
     record_fps: int = 50
     record_min_seconds: float = 30.0
     video_prefix: str = "gen"
@@ -66,10 +73,18 @@ class BRKGAConfig:
     run_id: Optional[str] = None
 
     # Early stopping
-    early_stop_patience: int = 8
+    early_stop_patience: int = 20
     early_stop_min_delta: float = 1e-6
 
     def __post_init__(self) -> None:
+        if self.env_id != "MountainCarContinuous-v0":
+            raise ValueError("This project is currently configured for MountainCarContinuous-v0 only.")
+        if isinstance(self.hidden_layers, int):
+            self.hidden_layers = (self.hidden_layers,)
+        elif isinstance(self.hidden_layers, list):
+            self.hidden_layers = tuple(self.hidden_layers)
+        elif not isinstance(self.hidden_layers, tuple):
+            raise ValueError("hidden_layers must be an int, list[int], or tuple[int, ...].")
         if self.pop_size < 2:
             raise ValueError("pop_size must be >= 2.")
         if self.generations < 1:
@@ -78,6 +93,14 @@ class BRKGAConfig:
             raise ValueError("episodes_per_individual must be >= 1.")
         if self.max_steps < 1:
             raise ValueError("max_steps must be >= 1.")
+        if not isinstance(self.use_shaped_fitness, bool):
+            raise ValueError("use_shaped_fitness must be a bool.")
+        if self.mountaincar_progress_scale < 0.0:
+            raise ValueError("mountaincar_progress_scale must be >= 0.")
+        if self.mountaincar_velocity_scale < 0.0:
+            raise ValueError("mountaincar_velocity_scale must be >= 0.")
+        if self.mountaincar_goal_bonus < 0.0:
+            raise ValueError("mountaincar_goal_bonus must be >= 0.")
         if not isinstance(self.fixed_eval_seeds, bool):
             raise ValueError("fixed_eval_seeds must be a bool.")
         if not self.hidden_layers:

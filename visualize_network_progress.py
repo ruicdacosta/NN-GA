@@ -41,9 +41,19 @@ def main() -> None:
 
     for p in agent_paths:
         gen = _gen_from_path(p)
-        genome, hidden_layers, _meta = load_agent_bundle(p)
+        genome, hidden_layers, meta = load_agent_bundle(p)
+        env_id = "MountainCarContinuous-v0"
+        if isinstance(meta, dict):
+            training_cfg = meta.get("training_config")
+            if isinstance(training_cfg, dict) and isinstance(training_cfg.get("env_id"), str):
+                env_id = training_cfg["env_id"]
         out_path = os.path.join(out_dir, f"network_gen_{gen:03d}.png")
-        save_policy_network_plot(genome=genome, hidden_layers=hidden_layers, out_path=out_path)
+        save_policy_network_plot(
+            genome=genome,
+            hidden_layers=hidden_layers,
+            out_path=out_path,
+            env_id=env_id,
+        )
         print(f"[NN] Gen {gen:03d}: {out_path}")
 
     print("\nDone. You can compare frames in order or build a video externally if needed.")

@@ -30,6 +30,11 @@ def main() -> None:
     max_steps = 500
 
     genome, hidden_layers, meta = load_agent_bundle(agent_path)
+    env_id = "MountainCarContinuous-v0"
+    if isinstance(meta, dict):
+        training_cfg = meta.get("training_config")
+        if isinstance(training_cfg, dict) and isinstance(training_cfg.get("env_id"), str):
+            env_id = training_cfg["env_id"]
     print(f"Loaded agent: {agent_path}")
     if meta:
         print(f"Metadata keys: {sorted(meta.keys())}")
@@ -43,6 +48,7 @@ def main() -> None:
         episodes=episodes,
         max_steps=max_steps,
         seed=123,
+        env_id=env_id,
     )
 
     if mp4_path:

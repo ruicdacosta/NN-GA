@@ -1,6 +1,6 @@
 # algorithm.py
 """
-BRKGA core logic for CartPole policy search.
+BRKGA core logic for MountainCar policy search.
 """
 
 import os
@@ -58,6 +58,11 @@ def _worker_eval_one(args) -> float:
         episodes=cfg.episodes_per_individual,
         max_steps=cfg.max_steps,
         seed=seed,
+        env_id=cfg.env_id,
+        use_shaped_fitness=cfg.use_shaped_fitness,
+        mountaincar_progress_scale=cfg.mountaincar_progress_scale,
+        mountaincar_velocity_scale=cfg.mountaincar_velocity_scale,
+        mountaincar_goal_bonus=cfg.mountaincar_goal_bonus,
     )
 
 
@@ -77,8 +82,15 @@ def evaluate_population_parallel(
     if cfg.processes <= 1:
         scores = [_worker_eval_one(a) for a in args]
     else:
-        with mp.Pool(processes=cfg.processes) as pool:
-            scores = pool.map(_worker_eval_one, args)
+        try:
+            with mp.Pool(processes=cfg.processes) as pool:
+                scores = pool.map(_worker_eval_one, args)
+        except (PermissionError, OSError) as e:
+            print(
+                f"[WARN] Multiprocessing unavailable ({e}). "
+                "Falling back to single-process evaluation."
+            )
+            scores = [_worker_eval_one(a) for a in args]
 
     return np.asarray(scores, dtype=np.float64)
 
@@ -128,7 +140,7 @@ def run_brkga(
     os.makedirs(cfg.plot_dir, exist_ok=True)
     os.makedirs(cfg.agent_dir, exist_ok=True)
 
-    template = make_template_model(hidden_layers=cfg.hidden_layers)
+    template = make_template_model(hidden_layers=cfg.hidden_layers, env_id=cfg.env_id)
     genome_len = int(flatten_params(template).size)
 
     low, high = make_gene_bounds(genome_len, cfg)

@@ -10,14 +10,19 @@ from video_utils import record_policy_to_mp4
 def validate_agent(
     agent_path: str,
     out_dir: str,
-    max_steps: int = 500,
+    max_steps: int = 999,
     seed: int = 123,
     prefix: str = "validated_agent",
 ) -> Optional[str]:
     """
     Record one full episode from reset to termination/truncation.
     """
-    genome, hidden_layers, _meta = load_agent_bundle(agent_path)
+    genome, hidden_layers, meta = load_agent_bundle(agent_path)
+    env_id = "MountainCarContinuous-v0"
+    if isinstance(meta, dict):
+        training_cfg = meta.get("training_config")
+        if isinstance(training_cfg, dict) and isinstance(training_cfg.get("env_id"), str):
+            env_id = training_cfg["env_id"]
 
     return record_policy_to_mp4(
         genome=genome,
@@ -30,6 +35,7 @@ def validate_agent(
         video_length_steps=max_steps,
         record_each_episode=False,
         seed=seed,
+        env_id=env_id,
     )
 
 

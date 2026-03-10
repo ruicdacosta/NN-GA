@@ -1,6 +1,6 @@
 # visualizer_utils.py
 """
-Visualization helpers for BRKGA CartPole.
+Visualization helpers for BRKGA MountainCar.
 
 These plots/logs reflect what the evolutionary algorithm is doing:
 - best fitness per generation

@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from agent_store import load_agent_bundle
-from fitness_function import PolicyNet, get_cartpole_dims, unflatten_params
+from fitness_function import PolicyNet, get_env_dims, is_continuous_env, unflatten_params
 
 
 def _layer_positions(
@@ -50,16 +50,22 @@ def save_policy_network_plot(
     genome: np.ndarray,
     hidden_layers: Sequence[int],
     out_path: str,
+    env_id: str = "MountainCarContinuous-v0",
     generation: Optional[int] = None,
 ) -> str:
     """
     Save network graph for PolicyNet:
-    input(4) -> hidden... -> output(2)
+    input(obs_dim) -> hidden... -> output(act_dim)
     Edge color: green (+) / orange-red (-), alpha by |weight|.
     Node fill (hidden/output): bias sign + magnitude.
     """
-    obs_dim, act_dim = get_cartpole_dims()
-    model = PolicyNet(obs_dim=obs_dim, hidden_layers=hidden_layers, act_dim=act_dim)
+    obs_dim, act_dim = get_env_dims(env_id)
+    model = PolicyNet(
+        obs_dim=obs_dim,
+        hidden_layers=hidden_layers,
+        act_dim=act_dim,
+        continuous_action=is_continuous_env(env_id),
+    )
     unflatten_params(model, genome)
 
     linear_layers = list(model.layers)
@@ -191,9 +197,19 @@ def main() -> None:
         agent_path = os.path.join(latest_run, "agents", "best_agent.npz")
         default_out = os.path.join(latest_run, "plots", "best_network.png")
 
-    genome, hidden_layers, _meta = load_agent_bundle(agent_path)
+    genome, hidden_layers, meta = load_agent_bundle(agent_path)
+    env_id = "MountainCarContinuous-v0"
+    if isinstance(meta, dict):
+        training_cfg = meta.get("training_config")
+        if isinstance(training_cfg, dict) and isinstance(training_cfg.get("env_id"), str):
+            env_id = training_cfg["env_id"]
     out_path = "" if args.show else (args.save_path or default_out)
-    rendered = save_policy_network_plot(genome=genome, hidden_layers=hidden_layers, out_path=out_path)
+    rendered = save_policy_network_plot(
+        genome=genome,
+        hidden_layers=hidden_layers,
+        out_path=out_path,
+        env_id=env_id,
+    )
     if rendered:
         print(f"[NN] Rendered: {rendered}")
 

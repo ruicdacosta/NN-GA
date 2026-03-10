@@ -123,7 +123,12 @@ def render_all_agents(
 
     os.makedirs(out_dir, exist_ok=True)
     for agent_path in agent_paths:
-        genome, hidden_layers, _meta = load_agent_bundle(agent_path)
+        genome, hidden_layers, meta = load_agent_bundle(agent_path)
+        env_id = "MountainCarContinuous-v0"
+        if isinstance(meta, dict):
+            training_cfg = meta.get("training_config")
+            if isinstance(training_cfg, dict) and isinstance(training_cfg.get("env_id"), str):
+                env_id = training_cfg["env_id"]
         stem = os.path.splitext(os.path.basename(agent_path))[0]
         gen = _extract_generation_from_name(stem)
         out_path = os.path.join(out_dir, f"{stem}_network.png")
@@ -132,6 +137,7 @@ def render_all_agents(
             genome=genome,
             hidden_layers=hidden_layers,
             out_path=out_path,
+            env_id=env_id,
             generation=gen,
         )
         rendered_paths.append(out_path)

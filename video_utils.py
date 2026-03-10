@@ -1,6 +1,6 @@
 # video_utils.py
 """
-Video utilities for recording CartPole policies to MP4.
+Video utilities for recording MountainCar policies to MP4.
 """
 
 import os
@@ -9,7 +9,7 @@ from typing import Optional, Sequence
 import gymnasium as gym
 import numpy as np
 
-from fitness_function import PolicyNet, unflatten_params
+from fitness_function import PolicyNet, is_continuous_env, unflatten_params
 
 
 def record_policy_to_mp4(
@@ -23,6 +23,7 @@ def record_policy_to_mp4(
     video_length_steps: Optional[int] = None,
     record_each_episode: bool = False,
     seed: int = 0,
+    env_id: str = "MountainCarContinuous-v0",
 ) -> Optional[str]:
     """
     Records MP4 with Gymnasium RecordVideo.
@@ -30,7 +31,7 @@ def record_policy_to_mp4(
     """
     os.makedirs(out_dir, exist_ok=True)
 
-    env = gym.make("CartPole-v1", render_mode="rgb_array")
+    env = gym.make(env_id, render_mode="rgb_array")
     name_prefix = f"{prefix}_{gen:03d}"
 
     try:
@@ -53,9 +54,17 @@ def record_policy_to_mp4(
         return None
 
     obs_dim = int(env.observation_space.shape[0])
-    act_dim = int(env.action_space.n)
+    if hasattr(env.action_space, "n"):
+        act_dim = int(env.action_space.n)
+    else:
+        act_dim = int(env.action_space.shape[0])
 
-    model = PolicyNet(obs_dim=obs_dim, hidden_layers=hidden_layers, act_dim=act_dim)
+    model = PolicyNet(
+        obs_dim=obs_dim,
+        hidden_layers=hidden_layers,
+        act_dim=act_dim,
+        continuous_action=is_continuous_env(env_id),
+    )
     unflatten_params(model, genome)
 
     rng = np.random.default_rng(seed + gen * 12345)
